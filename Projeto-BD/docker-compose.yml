@@ -1,0 +1,70 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${PGUSER:-postgres}
+      POSTGRES_PASSWORD: ${PGPASSWORD:-postgres}
+      POSTGRES_DB: ${PGDATABASE:-polyglot}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  mongo:
+    image: mongo:7
+    volumes:
+      - mongo_data:/data/db
+    ports:
+      - "27017:27017"
+
+  redis:
+    image: redis:7
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+
+  users-service:
+    build: ./services/users-service
+    env_file: .env
+    depends_on:
+      - postgres
+    ports:
+      - "8001:8000" 
+
+  movies-service:
+    build: ./services/movies-service
+    env_file: .env
+    depends_on:
+      - mongo
+    ports:
+      - "8002:8000" 
+
+  ratings-service:
+    build: ./services/ratings-service
+    env_file: .env
+    depends_on:
+      - redis
+    ports:
+      - "8003:8000" 
+
+  s1-manager:
+    build: ./services/s1-manager
+    env_file: .env
+    depends_on:
+      - users-service
+      - movies-service
+      - ratings-service
+      - postgres   
+    environment:
+      - USERS_BASE_URL=http://users-service:8000
+      - MOVIES_BASE_URL=http://movies-service:8000
+      - RATINGS_BASE_URL=http://ratings-service:8000
+    ports:
+      - "8000:8000" 
+
+volumes:
+  pg_data:
+  mongo_data:
+  redis_data:
